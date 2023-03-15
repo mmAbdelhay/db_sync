@@ -1,0 +1,4 @@
+- run npm install
+- cp .env.example .env
+- fill env file
+- npm run start
