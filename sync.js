@@ -1,5 +1,7 @@
 require("dotenv").config();
 const mysql = require("mysql2");
+const child_process = require("child_process");
+const { stderr } = require("process");
 
 const src_db = process.env.src_db;
 const tgt_db = process.env.tgt_db;
@@ -31,18 +33,27 @@ targetConnection.query("CREATE DATABASE IF NOT EXISTS `" + tgt_db + "`", (err, r
         });
         tables.forEach((table) => {
           targetConnection.query(
-            "CREATE TABLE IF NOT EXISTS `" +
-              tgt_db +
-              "`.`" +
-              table +
-              "` AS SELECT * FROM `" +
-              src_db +
-              "`.`" +
-              table +
-              "`"
+            "CREATE TABLE IF NOT EXISTS `" + tgt_db + "`.`" + table + "` LIKE `" + src_db + "`.`" + table + "`",
+            (err, data) => {
+              if (err) {
+                console.error(err);
+              } else {
+                setTimeout(() => {
+                  child_process.exec(
+                    `pt-table-sync --execute --no-check-slave --verbose --no-unique-checks h=${process.env.src_host},P=${process.env.src_port},u=${process.env.src_user},p=${process.env.src_password},D=${process.env.src_db},t=${table} h=${process.env.tgt_host},P=${process.env.tgt_port},u=${process.env.tgt_user},p=${process.env.tgt_password},D=${process.env.tgt_db}`,
+                    (err, stdout, stderr) => {
+                      if (err) {
+                        console.error(stderr);
+                      } else {
+                        console.log(stdout);
+                      }
+                    }
+                  );
+                }, 1000);
+              }
+            }
           );
         });
-        console.log("sync is complete");
       }
     });
   }
