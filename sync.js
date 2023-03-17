@@ -67,7 +67,7 @@ targetConnection.query("CREATE DATABASE IF NOT EXISTS `" + tgt_db + "`", (err, r
                       }
                     }
                   );
-                }, 1000);
+                }, 3000);
               }
             }
           );
