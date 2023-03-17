@@ -1,10 +1,28 @@
 require("dotenv").config();
 const mysql = require("mysql2");
 const child_process = require("child_process");
-const { stderr } = require("process");
 
 const src_db = process.env.src_db;
 const tgt_db = process.env.tgt_db;
+
+child_process.exec("perl --version", (error, stdout, stderr) => {
+  if (error) {
+    console.error(`Error checking for Perl: ${error.message}`);
+    process.exit(1);
+  }
+  if (stderr) {
+    console.error(`Error checking for Perl: ${stderr}`);
+    process.exit(1);
+  }
+  // Check the output for the Perl version number
+  const perlVersionMatch = stdout.match(/This is perl/);
+  if (perlVersionMatch) {
+    console.log(`Perl is installed`);
+  } else {
+    console.log(`Perl is not installed`);
+    process.exit(1);
+  }
+});
 
 const sourceConnection = mysql.createConnection({
   host: process.env.src_host,
@@ -40,7 +58,7 @@ targetConnection.query("CREATE DATABASE IF NOT EXISTS `" + tgt_db + "`", (err, r
               } else {
                 setTimeout(() => {
                   child_process.exec(
-                    `pt-table-sync --execute --no-check-slave --verbose --no-unique-checks h=${process.env.src_host},P=${process.env.src_port},u=${process.env.src_user},p=${process.env.src_password},D=${process.env.src_db},t=${table} h=${process.env.tgt_host},P=${process.env.tgt_port},u=${process.env.tgt_user},p=${process.env.tgt_password},D=${process.env.tgt_db}`,
+                    `perl pt-table-sync-local.pl --execute --no-check-slave --verbose --no-unique-checks h=${process.env.src_host},P=${process.env.src_port},u=${process.env.src_user},p=${process.env.src_password},D=${process.env.src_db},t=${table} h=${process.env.tgt_host},P=${process.env.tgt_port},u=${process.env.tgt_user},p=${process.env.tgt_password},D=${process.env.tgt_db}`,
                     (err, stdout, stderr) => {
                       if (err) {
                         console.error(stderr);
