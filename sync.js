@@ -40,40 +40,50 @@ const targetConnection = mysql.createConnection({
 });
 
 targetConnection.query("CREATE DATABASE IF NOT EXISTS `" + tgt_db + "`", (err, result) => {
-  if (err) {
-    console.log(err);
-  } else {
-    sourceConnection.query(`show tables;`, (err, results) => {
-      if (err) {
-        console.error(err);
-      } else {
-        let tables = [];
-        Object.entries(results).forEach((obj) => {
-          tables.push(Object.values(obj[1])[0]);
-        });
-        tables.forEach((table, index) => {
-          targetConnection.query(
-            "CREATE TABLE IF NOT EXISTS `" + tgt_db + "`.`" + table + "` LIKE `" + src_db + "`.`" + table + "`",
-            (err, data) => {
-              if (err) {
-                console.error(err);
-              } else {
-                child_process.exec(
-                  `perl pt-table-sync-local.pl --execute --no-check-slave --verbose --no-unique-checks h=${process.env.src_host},P=${process.env.src_port},u=${process.env.src_user},p=${process.env.src_password},D=${process.env.src_db},t=${table} h=${process.env.tgt_host},P=${process.env.tgt_port},u=${process.env.tgt_user},p=${process.env.tgt_password},D=${process.env.tgt_db}`,
-                  (err, stdout, stderr) => {
-                    if (err) {
-                      console.error(stderr);
-                    } else {
-                      console.log(stdout);
-                      console.timeLog("syncing");
-                    }
-                  }
-                );
-              }
+  if (err) throw err;
+
+  const newTargetConnection = mysql.createConnection({
+    host: process.env.tgt_host,
+    user: process.env.tgt_user,
+    password: process.env.tgt_password,
+    database: tgt_db,
+  });
+
+  sourceConnection.query(`show tables;`, (err, results) => {
+    if (err) {
+      console.error(err);
+    } else {
+      let tables = [];
+      Object.entries(results).forEach((obj) => {
+        tables.push(Object.values(obj[1])[0]);
+      });
+      tables.forEach((table, index) => {
+        sourceConnection.query(`show create table ${table}`, (error, results, fields) => {
+          if (error) throw error;
+
+          const createStatement = Object.entries(results[0])[1][1];
+          const test = createStatement.split("CREATE TABLE `" + table + "`")[1];
+
+          // Execute the CREATE TABLE statement on the target host
+          newTargetConnection.query("CREATE TABLE IF NOT EXISTS `" + table + "` " + test, (error, results, fields) => {
+            if (error) {
+              console.log(error);
             }
-          );
+
+            child_process.exec(
+              `perl pt-table-sync-local.pl --execute --no-check-slave --verbose --no-unique-checks h=${process.env.src_host},P=${process.env.src_port},u=${process.env.src_user},p=${process.env.src_password},D=${process.env.src_db},t=${table} h=${process.env.tgt_host},P=${process.env.tgt_port},u=${process.env.tgt_user},p=${process.env.tgt_password},D=${process.env.tgt_db}`,
+              (err, stdout, stderr) => {
+                if (err) {
+                  console.error(stderr);
+                } else {
+                  console.log(stdout);
+                  console.timeLog("syncing");
+                }
+              }
+            );
+          });
         });
-      }
-    });
-  }
+      });
+    }
+  });
 });
