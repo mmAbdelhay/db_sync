@@ -29,12 +29,14 @@ child_process.exec("perl --version", (error, stdout, stderr) => {
 const sourceConnection = mysql.createConnection({
   host: process.env.src_host,
   user: process.env.src_user,
+  port: process.env.src_port,
   password: process.env.src_password,
   database: src_db,
 });
 
 const targetConnection = mysql.createConnection({
   host: process.env.tgt_host,
+  port: process.env.tgt_port,
   user: process.env.tgt_user,
   password: process.env.tgt_password,
 });
@@ -44,6 +46,7 @@ targetConnection.query("CREATE DATABASE IF NOT EXISTS `" + tgt_db + "`", (err, r
 
   const newTargetConnection = mysql.createConnection({
     host: process.env.tgt_host,
+    port: process.env.tgt_port,
     user: process.env.tgt_user,
     password: process.env.tgt_password,
     database: tgt_db,
