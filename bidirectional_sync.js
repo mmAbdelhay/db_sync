@@ -1,7 +1,6 @@
 require("dotenv").config();
 const mysql = require("mysql2/promise");
 const { exec } = require("child_process");
-const { table } = require("console");
 const _ = require("lodash");
 
 (async () => {
