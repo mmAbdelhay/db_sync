@@ -74,7 +74,6 @@ console.time("syncing");
         (error, stdout, stderr) => {
           if (error) {
             console.error(`pt-table-sync error: ${error.message}`);
-            return;
           }
           if (stderr) {
             console.error(`pt-table-sync stderr: ${stderr}`);
