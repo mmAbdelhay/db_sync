@@ -62,7 +62,12 @@ console.time("syncing");
       const [createStatementFromDB] = await srcConnection.execute(`SHOW CREATE TABLE ${table} ;`);
       const createStatement = Object.entries(createStatementFromDB[0])[1][1];
       const testStatement = createStatement.split("CREATE TABLE `" + table + "`")[1];
-      await newTgtConnection.execute("CREATE TABLE IF NOT EXISTS `" + table + "` " + testStatement);
+
+      try {
+        await newTgtConnection.execute("CREATE TABLE IF NOT EXISTS `" + table + "` " + testStatement);
+      } catch (err) {
+        console.log(err);
+      }
 
       const [columns] = await srcConnection.execute(
         `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '${process.env.src_db}' AND TABLE_NAME = '${table}';`
