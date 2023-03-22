@@ -3,7 +3,28 @@ const mysql = require("mysql2/promise");
 const { exec } = require("child_process");
 const _ = require("lodash");
 
+console.time("syncing");
+
 (async () => {
+  exec("perl --version", (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error checking for Perl: ${error.message}`);
+      process.exit(1);
+    }
+    if (stderr) {
+      console.error(`Error checking for Perl: ${stderr}`);
+      process.exit(1);
+    }
+    // Check the output for the Perl version number
+    const perlVersionMatch = stdout.match(/This is perl/);
+    if (perlVersionMatch) {
+      console.log(`Perl is installed`);
+    } else {
+      console.log(`Perl is not installed`);
+      process.exit(1);
+    }
+  });
+
   const srcConnection = await mysql.createConnection({
     host: process.env.src_host,
     user: process.env.src_user,
@@ -42,27 +63,27 @@ const _ = require("lodash");
       const createStatement = Object.entries(createStatementFromDB[0])[1][1];
       const testStatement = createStatement.split("CREATE TABLE `" + table + "`")[1];
       await newTgtConnection.execute("CREATE TABLE IF NOT EXISTS `" + table + "` " + testStatement);
-      const [src_results] = await srcConnection.execute(`SELECT * FROM ${table}`);
-      const [tgt_results] = await newTgtConnection.execute(`SELECT * FROM ${table}`);
 
-      if (_.isEqual(src_results, tgt_results)) {
-        console.log("The tables have the same data");
-      } else {
-        exec(
-          `perl pt-table-sync-local.pl --print --bidirectional h=${process.env.src_host},P=${process.env.src_port},u=${process.env.src_user},p=${process.env.src_password},D=${process.env.src_db},t=${table}, h=${process.env.tgt_host},P=${process.env.tgt_port},u=${process.env.tgt_user},p=${process.env.tgt_password},D=${process.env.tgt_db},t=${table}`,
-          (error, stdout, stderr) => {
-            if (error) {
-              console.error(`pt-table-sync error: ${error.message}`);
-              return;
-            }
-            if (stderr) {
-              console.error(`pt-table-sync stderr: ${stderr}`);
-              return;
-            }
-            console.log(`pt-table-sync stdout: ${stdout}`);
+      const [columns] = await srcConnection.execute(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '${process.env.src_db}' AND TABLE_NAME = '${table}';`
+      );
+      const conflictColumn = columns[0].COLUMN_NAME;
+
+      exec(
+        `perl pt-table-sync-local.pl --execute --verbose --bidirectional --conflict-column ${conflictColumn}  --conflict-comparison newest h=${process.env.src_host},P=${process.env.src_port},u=${process.env.src_user},p=${process.env.src_password},D=${process.env.src_db},t=${table}, h=${process.env.tgt_host},P=${process.env.tgt_port},u=${process.env.tgt_user},p=${process.env.tgt_password},D=${process.env.tgt_db},t=${table}`,
+        (error, stdout, stderr) => {
+          if (error) {
+            console.error(`pt-table-sync error: ${error.message}`);
+            return;
           }
-        );
-      }
+          if (stderr) {
+            console.error(`pt-table-sync stderr: ${stderr}`);
+            return;
+          }
+          console.log(`pt-table-sync stdout: ${stdout}`);
+          console.timeLog("syncing");
+        }
+      );
     });
   }
 })();
